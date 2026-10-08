@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas Kebap | Sipariş</title>
+<style>
+:root{--ink:#161412;--mut:#6b655e;--bg:#f6f4f1;--card:#fff;--red:#b3141b;--line:#e4dfd8;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media(prefers-color-scheme:dark){:root{--ink:#f2eee9;--mut:#a39c93;--bg:#141210;--card:#1e1b18;--line:#34302b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);padding-bottom:84px}
+header{padding:20px 16px 8px}h1{margin:0;font-size:28px;letter-spacing:-.5px}header p{margin:4px 0 0;color:var(--mut);font-size:14px}
+nav{position:sticky;top:0;background:var(--bg);display:flex;gap:8px;overflow-x:auto;padding:10px 16px;border-bottom:1px solid var(--line);z-index:5}
+nav button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:20px;font-size:15px}
+nav button.on{background:var(--red);border-color:var(--red);color:#fff}
+section{padding:6px 16px}h2{font-size:20px;margin:22px 0 8px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:8px;font:inherit}
+.item b{display:block;font-size:16px}.item small{color:var(--mut);display:block;margin-top:3px}.pr{color:var(--red);font-weight:700;white-space:nowrap}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;z-index:20}.sheet.open{display:flex}
+.box{background:var(--bg);width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px 24px;max-width:640px;margin:0 auto}
+.box h3{margin:0 0 4px;font-size:22px}.grp{margin:16px 0 4px;font-weight:700}
+label.opt{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;margin-top:6px}
+label.opt input{width:20px;height:20px;accent-color:var(--red)}
+.row{display:flex;align-items:center;justify-content:space-between;margin:12px 0}
+.q{display:flex;align-items:center;gap:14px}.q button{width:38px;height:38px;border-radius:10px;border:0;background:var(--red);color:#fff;font-size:22px}
+.main{width:100%;border:0;background:var(--red);color:#fff;padding:15px;border-radius:12px;font-size:17px;font-weight:700;margin-top:14px}
+.ghost{border:0;background:none;color:var(--mut);padding:10px 0;font-size:15px}
+input[type=text],input[type=tel],textarea,select{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;margin-top:8px}
+#bar{position:fixed;left:12px;right:12px;bottom:12px;max-width:616px;margin:0 auto;display:none;justify-content:space-between;background:var(--red);color:#fff;border:0;border-radius:14px;padding:16px;font-size:17px;font-weight:700;z-index:10}
+.err{color:var(--red);font-size:14px;margin-top:8px}.ok{text-align:center;padding:30px 10px}
+</style>
+</head>
+<body>
+<header><h1>Atlas Kebap</h1><p>Ürününü seç, sepete ekle, siparişini ver.</p></header>
+<nav id="nav"></nav>
+<main id="menu"><section><p style="color:var(--mut)">Menü yükleniyor...</p></section></main>
+<button id="bar" onclick="openCart()"><span id="bc"></span><span id="bt"></span></button>
+<div class="sheet" id="sh"><div class="box" id="bx"></div></div>
+<script>
+const U='https://etwfirgtyrrqjyueyila.supabase.co',K='sb_publishable_C32salxlIyquSu628KScfQ_EFAvUik4';
+const H={apikey:K,'Content-Type':'application/json'};
+const TL=n=>Number(n).toLocaleString('tr-TR')+' ₺';
+const PAY=['Nakit','Kredi / Banka Kartı (kapıda)','Pluxee (Sodexo) Kartı','Multinet Kartı','Ticket Kartı','Metropol Kartı','Setcard Kartı','Edenred Kartı'];
+let P=[],cart=[],cur=null,qty=1;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load(){
+  try{
+    const r=await fetch(U+'/rest/v1/products?select=*&active=eq.true&order=sort,id',{headers:H});
+    if(!r.ok)throw 0;P=await r.json();draw();
+  }catch(e){$('menu').innerHTML='<section><p class="err">Menü yüklenemedi. Sayfayı yenileyin.</p></section>'}
+}
+function draw(){
+  const cats=[...new Set(P.map(p=>p.category))];
+  $('nav').innerHTML=cats.map((c,i)=>`<button onclick="go(${i})" id="n${i}" class="${i?'':'on'}">${esc(c)}</button>`).join('');
+  $('menu').innerHTML=cats.map((c,i)=>`<section id="c${i}"><h2>${esc(c)}</h2>`+P.filter(p=>p.category===c).map(p=>
+    `<button class="item" onclick="pick(${p.id})"><span><b>${esc(p.name)}</b>${p.description?`<small>${esc(p.description)}</small>`:''}</span><span class="pr">${TL(p.price)}</span></button>`).join('')+'</section>').join('');
+}
+function go(i){$('c'+i).scrollIntoView({behavior:'smooth'});document.querySelectorAll('nav button').forEach((b,j)=>b.classList.toggle('on',i===j))}
+function show(h){$('bx').innerHTML=h;$('sh').classList.add('open')}
+function hide(){$('sh').classList.remove('open')}
+$('sh').onclick=e=>{if(e.target.id==='sh')hide()};
+
+function pick(id){
+  cur=P.find(p=>p.id===id);qty=1;
+  const g=(cur.options||[]).map((o,gi)=>`<div class="grp">${esc(o.title)}</div>`+o.items.map((it,ii)=>
+    `<label class="opt"><span>${esc(it.name)}${it.price?` <b class="pr">+${TL(it.price)}</b>`:''}</span><input type="checkbox" data-g="${gi}" data-i="${ii}" onchange="tot()"></label>`).join('')).join('');
+  show(`<h3>${esc(cur.name)}</h3><div class="pr">${TL(cur.price)}</div>${cur.description?`<p style="color:var(--mut)">${esc(cur.description)}</p>`:''}${g}
+  <div class="row"><div class="q"><button onclick="qn(-1)">−</button><b id="qv">1</b><button onclick="qn(1)">+</button></div><b id="pt"></b></div>
+  <button class="main" onclick="add()">Sepete ekle</button><button class="ghost" onclick="hide()">Vazgeç</button>`);
+  tot();
+}
+function chosen(){return[...document.querySelectorAll('#bx input[data-g]:checked')].map(c=>cur.options[c.dataset.g].items[c.dataset.i])}
+function unit(){return Number(cur.price)+chosen().reduce((a,o)=>a+Number(o.price||0),0)}
+function tot(){$('pt').textContent=TL(unit()*qty)}
+function qn(d){qty=Math.max(1,qty+d);$('qv').textContent=qty;tot()}
+function add(){
+  const o=chosen();
+  cart.push({name:cur.name,qty,options:o.map(x=>x.name),unit:unit(),line_total:unit()*qty});
+  hide();bar();
+}
+const sum=()=>cart.reduce((a,c)=>a+c.line_total,0);
+function bar(){const n=cart.reduce((a,c)=>a+c.qty,0);$('bar').style.display=n?'flex':'none';$('bc').textContent='Sepeti gör ('+n+')';$('bt').textContent=TL(sum())}
+
+function openCart(){
+  if(!cart.length)return;
+  show(`<h3>Sepetim</h3>`+cart.map((c,i)=>`<div class="row"><span><b>${c.qty} × ${esc(c.name)}</b>${c.options.length?`<small style="display:block;color:var(--mut)">${esc(c.options.join(', '))}</small>`:''}</span><span><b>${TL(c.line_total)}</b> <button class="ghost" onclick="rm(${i})">Sil</button></span></div>`).join('')+
+  `<div class="row"><b>Toplam</b><b class="pr">${TL(sum())}</b></div>
+  <input type="text" id="fn" placeholder="Ad Soyad" autocomplete="name">
+  <input type="tel" id="fp" placeholder="Telefon (05xx xxx xx xx)" autocomplete="tel">
+  <textarea id="fa" rows="3" placeholder="Açık adres (mahalle, sokak, bina, daire)" autocomplete="street-address"></textarea>
+  <select id="fy">${PAY.map(p=>`<option>${p}</option>`).join('')}</select>
+  <label class="opt"><span>Zil çalma</span><input type="checkbox" id="z1"></label>
+  <label class="opt"><span>Çatal & bıçak yolla</span><input type="checkbox" id="z2"></label>
+  <label class="opt"><span>Kapıma as</span><input type="checkbox" id="z3"></label>
+  <textarea id="fo" rows="2" placeholder="Sipariş notu"></textarea>
+  <div class="err" id="fe"></div>
+  <button class="main" id="fb" onclick="send()">Siparişi ver</button><button class="ghost" onclick="hide()">Menüye dön</button>`);
+}
+function rm(i){cart.splice(i,1);bar();cart.length?openCart():hide()}
+async function send(){
+  const n=$('fn').value.trim(),p=$('fp').value.trim(),a=$('fa').value.trim();
+  if(n.length<2||p.replace(/\D/g,'').length<10||a.length<10){$('fe').textContent='Ad, telefon ve açık adres alanlarını doldurun.';return}
+  const t=[$('z1').checked&&'Zil çalma',$('z2').checked&&'Çatal & bıçak yolla',$('z3').checked&&'Kapıma as',$('fo').value.trim()].filter(Boolean).join(' | ');
+  $('fb').disabled=true;$('fb').textContent='Gönderiliyor...';
+  try{
+    const r=await fetch(U+'/rest/v1/orders',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({customer_name:n,phone:p,address:a,payment_method:$('fy').value,note:t||null,items:cart,total:sum()})});
+    if(!r.ok)throw 0;
+    cart=[];bar();show('<div class="ok"><h3>Siparişiniz alındı</h3><p>Teşekkürler! Siparişiniz hazırlanıyor. Tahmini süre 15-25 dk.</p><button class="main" onclick="hide()">Menüye dön</button></div>');
+  }catch(e){$('fe').textContent='Sipariş gönderilemedi. Tekrar deneyin veya bizi arayın.';$('fb').disabled=false;$('fb').textContent='Siparişi ver'}
+}
+load();
+</script>
+</body>
+</html>
